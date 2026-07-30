@@ -1,3 +1,5 @@
+YAML
+
 version: '3.8'
 
 services:
@@ -5,7 +7,9 @@ services:
     build: .
     container_name: gestor_dicom_api
     ports:
-      - "8000:8000"
+      - "8866:8866" # <-- NUEVO PUERTO
+    environment:
+      - gestor_dicom_api_SECURE_COOKIE=false # <-- VARIABLE AGREGADA
     volumes:
       - ./archivos_recibidos:/app/archivos_recibidos
-    restart: unless-stopped
+    restart: always # <-- INICIA AUTOMÁTICAMENTE CON EL SERVIDOR
