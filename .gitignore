@@ -1,0 +1,7 @@
+# Ignorar la carpeta de archivos y pruebas médicas
+archivos_recibidos/
+
+# Ignorar archivos ocultos de Python o Mac/Windows
+__pycache__/
+*.pyc
+.DS_Store
