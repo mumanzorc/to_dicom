@@ -168,4 +168,5 @@ async def download_file(filename: str, token: str = Depends(oauth2_scheme)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8866)
+    
