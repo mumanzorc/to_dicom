@@ -14,7 +14,7 @@ COPY index.html .
 # Crear la carpeta de almacenamiento interno
 RUN mkdir -p archivos_recibidos
 
-EXPOSE 8000
+EXPOSE 8866
 
-# Iniciar servidor
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Iniciar servidor en el puerto 8866
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8866"]
