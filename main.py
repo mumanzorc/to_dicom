@@ -141,18 +141,77 @@ async def servir_interfaz():
         raise HTTPException(status_code=404, detail="Archivo de interfaz no encontrado.")
     return FileResponse("index.html")
 
+# --- RUTAS DE USUARIOS Y AUTENTICACIÓN ---
+
 @app.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Autenticación de usuarios."""
-    username = form_data.username
-    password = form_data.password
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Login conectado a la base de datos PostgreSQL"""
+    # Buscamos al usuario por su correo (que usamos como username en el formulario)
+    usuario = db.query(Usuario).filter(Usuario.correo == form_data.username).first()
     
-    if USUARIOS.get(username) != password:
+    if not usuario or not pwd_context.verify(form_data.password, usuario.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario o contraseña incorrectos",
+            detail="Correo o contraseña incorrectos",
         )
-    return {"access_token": username, "token_type": "bearer"}
+    
+    if not usuario.activo:
+        raise HTTPException(status_code=400, detail="Usuario inactivo")
+
+    # Devolvemos el ID del usuario en el token para saber quién sube archivos
+    return {"access_token": str(usuario.id), "token_type": "bearer"}
+
+@app.post("/usuarios", response_model=UsuarioResponse)
+async def crear_usuario(user: UsuarioCreate, db: Session = Depends(get_db)):
+    """Crea un nuevo usuario en la base de datos"""
+    # Verificar si el correo ya existe
+    db_user = db.query(Usuario).filter(Usuario.correo == user.correo).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
+    
+    # Encriptar contraseña
+    hashed_password = pwd_context.hash(user.password)
+    
+    nuevo_usuario = Usuario(
+        nombres=user.nombres,
+        apellidos=user.apellidos,
+        correo=user.correo,
+        telefono=user.telefono,
+        rol=user.rol,
+        password_hash=hashed_password
+    )
+    db.add(nuevo_usuario)
+    db.commit()
+    db.refresh(nuevo_usuario)
+    return nuevo_usuario
+
+@app.get("/usuarios", response_model=List[UsuarioResponse])
+async def listar_usuarios(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    """Devuelve la lista de todos los usuarios registrados"""
+    usuarios = db.query(Usuario).all()
+    return usuarios
+
+@app.put("/usuarios/{user_id}", response_model=UsuarioResponse)
+async def actualizar_usuario(user_id: int, user_data: UsuarioCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    """Permite editar los datos de un usuario existente"""
+    usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    usuario.nombres = user_data.nombres
+    usuario.apellidos = user_data.apellidos
+    usuario.correo = user_data.correo
+    usuario.telefono = user_data.telefono
+    usuario.rol = user_data.rol
+    
+    # Solo actualizar contraseña si se envía una nueva
+    if user_data.password:
+        usuario.password_hash = pwd_context.hash(user_data.password)
+        
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+    
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...), token: str = Depends(oauth2_scheme)):
