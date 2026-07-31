@@ -14,8 +14,8 @@ from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 from PIL import Image, ImageDraw
 
 # Importar nuestra base de datos
-from database import Base, engine, SessionLocal, Usuario
-
+#from database import Base, engine, SessionLocal, Usuario
+from database import Base, engine, SessionLocal, Usuario, Archivo
 # Crear las tablas en la base de datos si no existen
 Base.metadata.create_all(bind=engine)
 
@@ -211,15 +211,16 @@ async def actualizar_usuario(user_id: int, user_data: UsuarioCreate, db: Session
     db.commit()
     db.refresh(usuario)
     return usuario
-    
+
 
 @app.post("/upload")
-async def upload_files(files: List[UploadFile] = File(...), token: str = Depends(oauth2_scheme)):
-    """Recibe múltiples archivos, los procesa y devuelve un reporte por lotes."""
+async def upload_files(files: List[UploadFile] = File(...), token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """Convierte archivos y los registra en la Base de Datos PostgreSQL."""
     if not os.path.exists("archivos_recibidos"):
         os.makedirs("archivos_recibidos")
         
-    resultados = []
+    usuario_id = int(token) # El token actual guarda el ID del usuario
+    archivos_exitosos = 0
     
     for file in files:
         nombre_original = file.filename
@@ -229,11 +230,9 @@ async def upload_files(files: List[UploadFile] = File(...), token: str = Depends
         ruta_original = f"archivos_recibidos/{nombre_original}"
         ruta_dicom = f"archivos_recibidos/{nombre_base}.dcm"
         
-        # 1. Guardar archivo original
         with open(ruta_original, "wb+") as file_object:
             file_object.write(await file.read())
             
-        # 2. Aplicar lógica DICOM según extensión
         estado = "Éxito"
         try:
             if extension in ['jpg', 'jpeg']:
@@ -248,18 +247,49 @@ async def upload_files(files: List[UploadFile] = File(...), token: str = Depends
         except Exception as e:
             estado = f"Error interno: {str(e)}"
             
-        # 3. Guardar el resultado de este archivo en el lote
-        resultados.append({
-            "archivo_original": nombre_original,
-            "archivo_dicom": f"{nombre_base}.dcm" if estado == "Éxito" else None,
-            "estado": estado
-        })
+        # Guardar en Base de Datos si la conversión fue exitosa
+        if estado == "Éxito":
+            nuevo_archivo = Archivo(
+                nombre_original=nombre_original,
+                nombre_dicom=f"{nombre_base}.dcm",
+                ruta_fisica=ruta_dicom,
+                subido_por=usuario_id
+            )
+            db.add(nuevo_archivo)
+            db.commit()
+            archivos_exitosos += 1
         
-    return {
-        "mensaje": f"Procesamiento finalizado. {len(files)} archivos analizados.", 
-        "resultados": resultados
-    }
+    return {"mensaje": f"Proceso finalizado. {archivos_exitosos} archivo(s) guardado(s) en la base de datos."}
 
+@app.get("/archivos")
+async def listar_archivos(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    """Devuelve el listado completo de archivos registrados."""
+    archivos = db.query(Archivo).order_by(Archivo.fecha_subida.desc()).all()
+    return archivos
+
+@app.delete("/archivos/{archivo_id}")
+async def eliminar_archivo(archivo_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    """Elimina un archivo de la base de datos y del disco duro."""
+    archivo = db.query(Archivo).filter(Archivo.id == archivo_id).first()
+    if not archivo:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    
+    # Eliminar del disco físico
+    if os.path.exists(archivo.ruta_fisica):
+        os.remove(archivo.ruta_fisica)
+        
+    # Eliminar de la base de datos
+    db.delete(archivo)
+    db.commit()
+    return {"mensaje": "Archivo eliminado correctamente"}
+
+@app.get("/download/{filename}")
+async def download_file(filename: str, token: str = Depends(oauth2_scheme)):
+    ruta_archivo = f"archivos_recibidos/{filename}"
+    if not os.path.exists(ruta_archivo):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+    return FileResponse(path=ruta_archivo, filename=filename, media_type='application/dicom')
 
 @app.get("/download/{filename}")
 async def download_file(filename: str, token: str = Depends(oauth2_scheme)):
