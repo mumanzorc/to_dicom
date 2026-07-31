@@ -7,7 +7,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar el código del servidor y la interfaz
+# Copiar el código del servidor, la base de datos y la interfaz
+COPY database.py .
 COPY main.py .
 COPY index.html .
 
@@ -16,5 +17,5 @@ RUN mkdir -p archivos_recibidos
 
 EXPOSE 8866
 
-# Iniciar servidor en el puerto 8866
+# Iniciar servidor
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8866"]
