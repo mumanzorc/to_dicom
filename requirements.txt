@@ -7,3 +7,5 @@ Pillow==10.0.1
 numpy==1.25.2
 sqlalchemy
 psycopg2-binary
+passlib[bcrypt]
+bcrypt==4.0.1
