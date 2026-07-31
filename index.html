@@ -1,82 +1,418 @@
-PACS - Gestor Documental
-    
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PACS - Gestor Documental</title>
+    <style>
+        /* Diseño Corporativo base */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            width: 100%;
+        }
+        .login-box { max-width: 400px; margin: 40px auto; }
+        .app-box { max-width: 900px; margin: 0 auto; }
+        
+        h2, h3, h4 { color: #1a202c; margin-top: 0; }
+        h2 { text-align: center; margin-bottom: 24px; }
+        
+        /* Formularios y Botones */
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 14px; margin-bottom: 6px; color: #4a5568; }
+        input, select {
+            width: 100%; padding: 10px;
+            border: 1px solid #e2e8f0; border-radius: 4px;
+            box-sizing: border-box; font-size: 14px;
+        }
+        button {
+            padding: 10px 16px; background-color: #2b6cb0; color: white;
+            border: none; border-radius: 4px; font-size: 14px;
+            cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background-color: #2c5282; }
+        .btn-danger { background-color: #e53e3e; }
+        .btn-danger:hover { background-color: #c53030; }
+        .btn-success { background-color: #38a169; }
+        .btn-success:hover { background-color: #2f855a; }
+        
+        /* Navegación (Tabs) */
+        .nav-tabs {
+            display: flex; border-bottom: 2px solid #e2e8f0; margin-bottom: 24px; gap: 10px;
+        }
+        .tab-btn {
+            background: none; color: #4a5568; border: none; padding: 10px 20px;
+            cursor: pointer; font-size: 16px; border-bottom: 2px solid transparent; margin-bottom: -2px;
+        }
+        .tab-btn.active { color: #2b6cb0; border-bottom-color: #2b6cb0; font-weight: 600; }
+        
+        /* Tablas */
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+        th { background-color: #f7fafc; color: #4a5568; font-weight: 600; }
+        
+        /* Utilidades */
+        .hidden { display: none !important; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .msj-error { color: #e53e3e; font-size: 14px; text-align: center; margin-top: 10px; }
+        .msj-success { color: #38a169; font-size: 14px; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
 
+<!-- ================= CONTENEDOR DE LOGIN ================= -->
+<div id="login-container" class="container login-box">
+    <h2>Acceso al Sistema</h2>
+    <div class="form-group">
+        <label>Correo Electrónico (Usuario)</label>
+        <input type="text" id="login-user" placeholder="ejemplo@correo.com">
+    </div>
+    <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="login-pass" placeholder="••••••••">
+    </div>
+    <button onclick="iniciarSesion()" style="width: 100%;">Ingresar</button>
+    <div id="login-msg" class="msj-error"></div>
+</div>
 
+<!-- ================= CONTENEDOR PRINCIPAL (DASHBOARD) ================= -->
+<div id="app-container" class="container app-box hidden">
+    
+    <!-- Menú Superior -->
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="cambiarTab('dicom')">Conversor DICOM</button>
+        <button class="tab-btn" onclick="cambiarTab('usuarios'); cargarUsuarios();">Gestión de Usuarios</button>
+        <button class="tab-btn" onclick="cerrarSesion()" style="margin-left: auto; color: #e53e3e;">Cerrar Sesión</button>
+    </div>
 
+    <!-- PESTAÑA 1: CONVERSOR DICOM -->
+    <div id="tab-dicom" class="tab-content">
+        <h3>Convertir Archivos por Lotes</h3>
+        <div class="form-group">
+            <label>Seleccione múltiples archivos (TXT, JPG, PDF)</label>
+            <input type="file" id="fileInput" multiple>
+        </div>
+        <button onclick="subirArchivo()">Convertir Lote a DICOM</button>
+        
+        <div id="upload-msg" class="msj-success"></div>
+        
+        <!-- Contenedor para el reporte de subida masiva -->
+        <div id="batch-results-container" class="hidden" style="margin-top: 24px;">
+            <h4 style="margin-bottom: 10px;">Resultados de la Conversión</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Archivo Original</th>
+                        <th>Estado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="batch-results-body">
+                    <!-- Los resultados del lote aparecerán aquí -->
+                </tbody>
+            </table>
+        </div>
+    </div>
 
+    <!-- PESTAÑA 2: USUARIOS -->
+    <div id="tab-usuarios" class="tab-content hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Directorio de Usuarios</h3>
+            <button onclick="toggleFormularioUsuario()" class="btn-success">+ Nuevo Usuario</button>
+        </div>
 
-    Acceso al Sistema
-    
-        Correo Electrónico (Usuario)
-        
-    
-    
-        Contraseña
-        
-    
-    Ingresar
-    
+        <!-- Formulario de Nuevo Usuario (Oculto por defecto) -->
+        <div id="form-nuevo-usuario" class="hidden" style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
+            <h4 style="margin-top:0;">Crear Credenciales</h4>
+            <div class="grid-2">
+                <div class="form-group"><label>Nombres</label><input type="text" id="reg-nombres"></div>
+                <div class="form-group"><label>Apellidos</label><input type="text" id="reg-apellidos"></div>
+                <div class="form-group"><label>Correo</label><input type="text" id="reg-correo"></div>
+                <div class="form-group"><label>Teléfono</label><input type="text" id="reg-telefono"></div>
+                <div class="form-group"><label>Contraseña temporal</label><input type="password" id="reg-pass"></div>
+                <div class="form-group"><label>Rol</label>
+                    <select id="reg-rol">
+                        <option value="usuario">Médico / Usuario</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="crearUsuario()" class="btn-success">Guardar Usuario</button>
+            <button onclick="toggleFormularioUsuario()" style="background-color: #718096; margin-left: 8px;">Cancelar</button>
+            <div id="user-msg"></div>
+        </div>
 
+        <!-- Tabla de Usuarios -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombres</th>
+                    <th>Correo</th>
+                    <th>Teléfono</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-usuarios-body">
+                <!-- Los datos se cargarán aquí desde JS -->
+            </tbody>
+        </table>
+    </div>
 
+</div>
 
+<!-- ================= LOGICA JAVASCRIPT ================= -->
+<script>
+    const API_URL = ""; 
+    let userToken = "";
 
-    
-    
-    
-        Conversor DICOM
-        Gestión de Usuarios
-        Cerrar Sesión
-    
+    // --- NAVEGACIÓN ---
+    function cambiarTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        
+        document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+        event.currentTarget.classList.add('active');
+    }
 
-    
-    
-        Convertir Archivo
-        
-            Seleccione archivo (TXT, JPG, PDF)
-            
-        
-        Convertir a DICOM
-        
-        
-        
-        
-            Descargar DICOM Generado
-        
-    
+    // --- AUTENTICACIÓN ---
+    async function iniciarSesion() {
+        const user = document.getElementById("login-user").value;
+        const pass = document.getElementById("login-pass").value;
+        const msg = document.getElementById("login-msg");
 
-    
-    
-        
-            Directorio de Usuarios
-            + Nuevo Usuario
-        
+        const formData = new URLSearchParams();
+        formData.append("username", user);
+        formData.append("password", pass);
 
-        
-        
-            Crear Credenciales
-            
-                Nombres
-                Apellidos
-                Correo
-                Teléfono
-                Contraseña temporal
-                Rol
-                    
-                        Médico / Usuario
-                        Administrador
-                    
+        try {
+            const response = await fetch(`${API_URL}/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                userToken = data.access_token;
                 
-            
-            Guardar Usuario
-            
-        
+                document.getElementById("login-container").classList.add("hidden");
+                document.getElementById("app-container").classList.remove("hidden");
+                msg.innerText = "";
+            } else {
+                msg.innerText = "Credenciales incorrectas o usuario inactivo.";
+            }
+        } catch (error) {
+            msg.innerText = "Error conectando con el servidor.";
+        }
+    }
 
+    function cerrarSesion() {
+        userToken = "";
+        document.getElementById("app-container").classList.add("hidden");
+        document.getElementById("login-container").classList.remove("hidden");
+        document.getElementById("login-user").value = "";
+        document.getElementById("login-pass").value = "";
         
+        // Limpiar resultados anteriores
+        document.getElementById("batch-results-container").classList.add("hidden");
+        document.getElementById("batch-results-body").innerHTML = "";
+        document.getElementById("upload-msg").innerText = "";
+    }
+
+    // --- GESTIÓN DE USUARIOS ---
+    function toggleFormularioUsuario() {
+        const form = document.getElementById("form-nuevo-usuario");
+        form.classList.toggle("hidden");
+        document.getElementById("user-msg").innerText = "";
+    }
+
+    async function cargarUsuarios() {
+        const tbody = document.getElementById("tabla-usuarios-body");
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Cargando usuarios...</td></tr>';
         
+        try {
+            const response = await fetch(`${API_URL}/usuarios`, {
+                headers: { "Authorization": `Bearer ${userToken}` }
+            });
             
+            if (response.ok) {
+                const usuarios = await response.json();
+                tbody.innerHTML = "";
+                usuarios.forEach(u => {
+                    const estadoHtml = u.activo ? '<span style="color:green">Activo</span>' : '<span style="color:red">Inactivo</span>';
+                    const rolHtml = u.rol === 'admin' ? '<b>Admin</b>' : 'Usuario';
+                    
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${u.nombres} ${u.apellidos}</td>
+                            <td>${u.correo}</td>
+                            <td>${u.telefono}</td>
+                            <td>${rolHtml}</td>
+                            <td>${estadoHtml}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" style="color:red;">No tiene permisos para ver esta tabla.</td></tr>';
+            }
+        } catch (error) {
+            tbody.innerHTML = '<tr><td colspan="5" style="color:red;">Error al cargar datos de la base de datos.</td></tr>';
+        }
+    }
+
+    async function crearUsuario() {
+        const msg = document.getElementById("user-msg");
+        
+        const payload = {
+            nombres: document.getElementById("reg-nombres").value,
+            apellidos: document.getElementById("reg-apellidos").value,
+            correo: document.getElementById("reg-correo").value,
+            telefono: document.getElementById("reg-telefono").value,
+            password: document.getElementById("reg-pass").value,
+            rol: document.getElementById("reg-rol").value
+        };
+
+        if(!payload.nombres || !payload.correo || !payload.password) {
+            msg.className = "msj-error";
+            msg.innerText = "Nombres, correo y contraseña son obligatorios.";
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_URL}/usuarios`, {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${userToken}` 
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                msg.className = "msj-success";
+                msg.innerText = "Usuario creado exitosamente.";
+                cargarUsuarios();
                 
-                    Nombres
-                    Correo
-                    Teléfono
-                    Rol
-                    Estado
+                document.getElementById("reg-nombres").value = "";
+                document.getElementById("reg-apellidos").value = "";
+                document.getElementById("reg-correo").value = "";
+                document.getElementById("reg-telefono").value = "";
+                document.getElementById("reg-pass").value = "";
+                
+                setTimeout(() => toggleFormularioUsuario(), 1500);
+            } else {
+                const err = await response.json();
+                msg.className = "msj-error";
+                msg.innerText = err.detail || "Error al crear usuario.";
+            }
+        } catch (error) {
+            msg.className = "msj-error";
+            msg.innerText = "Error de conexión.";
+        }
+    }
+
+    // --- MOTOR DICOM BATCH ---
+    async function subirArchivo() {
+        const fileInput = document.getElementById("fileInput");
+        const msjUpload = document.getElementById("upload-msg");
+        const resultsContainer = document.getElementById("batch-results-container");
+        const tbody = document.getElementById("batch-results-body");
+
+        resultsContainer.classList.add("hidden");
+        tbody.innerHTML = "";
+
+        if (fileInput.files.length === 0) {
+            msjUpload.className = "msj-error";
+            msjUpload.innerText = "Por favor, seleccione al menos un archivo.";
+            return;
+        }
+
+        const formData = new FormData();
+        for (let i = 0; i < fileInput.files.length; i++) {
+            formData.append("files", fileInput.files[i]);
+        }
+
+        try {
+            msjUpload.className = "msj-success";
+            msjUpload.style.color = "#3182ce";
+            msjUpload.innerText = `Procesando ${fileInput.files.length} archivo(s)...`;
+
+            const response = await fetch(`${API_URL}/upload`, {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${userToken}` },
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                msjUpload.style.color = "#38a169";
+                msjUpload.innerText = data.mensaje;
+                
+                data.resultados.forEach(res => {
+                    const esExito = res.estado === "Éxito";
+                    const estadoHtml = esExito ? '<span style="color:green; font-weight: 500;">Éxito</span>' : `<span style="color:red">${res.estado}</span>`;
+                    const botonDicom = esExito ? `<button class="btn-success" onclick="descargarArchivo('${res.archivo_dicom}')" style="padding: 6px 12px; font-size: 12px; width: auto;">Descargar .dcm</button>` : '-';
+                    
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${res.archivo_original}</td>
+                            <td>${estadoHtml}</td>
+                            <td>${botonDicom}</td>
+                        </tr>
+                    `;
+                });
+                resultsContainer.classList.remove("hidden");
+                
+                fileInput.value = "";
+            } else {
+                msjUpload.className = "msj-error";
+                msjUpload.innerText = "Error en el servidor al procesar el lote.";
+            }
+        } catch (error) {
+            msjUpload.className = "msj-error";
+            msjUpload.innerText = "Error de conexión subiendo los archivos.";
+        }
+    }
+
+    async function descargarArchivo(nombreArchivo) {
+        try {
+            const response = await fetch(`${API_URL}/download/${nombreArchivo}`, {
+                method: "GET",
+                headers: { "Authorization": `Bearer ${userToken}` }
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = nombreArchivo;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } else {
+                alert("Error: No se pudo descargar el archivo.");
+            }
+        } catch (error) {
+            alert("Error de conexión al intentar descargar.");
+        }
+    }
+</script>
+</body>
+</html>
