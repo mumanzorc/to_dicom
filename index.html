@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PACS - Gestor Documental</title>
+    
+    <!-- Librerías de Cornerstone.js (Visor DICOM) -->
+    <script src="https://unpkg.com/dicom-parser/dist/dicomParser.js"></script>
+    <script src="https://unpkg.com/cornerstone-core/dist/cornerstone.js"></script>
+    <script src="https://unpkg.com/cornerstone-wado-image-loader/dist/cornerstoneWADOImageLoader.min.js"></script>
+
     <style>
         /* Diseño Corporativo base */
         body {
@@ -70,6 +76,26 @@
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .msj-error { color: #e53e3e; font-size: 14px; text-align: center; margin-top: 10px; }
         .msj-success { color: #38a169; font-size: 14px; text-align: center; margin-top: 10px; }
+
+        /* Visor DICOM Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: flex;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .dicom-viewer-box {
+            background: #000; border: 1px solid #4a5568; border-radius: 8px;
+            width: 90%; max-width: 800px; height: 80vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .viewer-header {
+            background: #1a202c; color: white; padding: 10px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        #dicomImage {
+            width: 100%; height: 100%; flex-grow: 1; position: relative;
+            user-select: none; -webkit-user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -135,7 +161,7 @@
             <button onclick="toggleFormularioUsuario()" class="btn-success">+ Nuevo Usuario</button>
         </div>
 
-        <!-- Formulario de Nuevo Usuario (Oculto por defecto) -->
+        <!-- Formulario de Nuevo Usuario -->
         <div id="form-nuevo-usuario" class="hidden" style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
             <h4 style="margin-top:0;">Crear Credenciales</h4>
             <div class="grid-2">
@@ -175,7 +201,18 @@
 
 </div>
 
-<!-- ================= LOGICA JAVASCRIPT ================= -->
+<!-- ================= VISOR DICOM MODAL ================= -->
+<div id="dicom-modal" class="modal-overlay hidden">
+    <div class="dicom-viewer-box">
+        <div class="viewer-header">
+            <span id="visor-title" style="font-weight: 600;">Visor DICOM</span>
+            <button onclick="cerrarVisor()" class="btn-danger" style="padding: 4px 10px;">Cerrar</button>
+        </div>
+        <div id="dicomImage"></div>
+    </div>
+</div>
+
+<!-- ================= LÓGICA JAVASCRIPT ================= -->
 <script>
     const API_URL = ""; 
     let userToken = "";
@@ -228,7 +265,6 @@
         document.getElementById("login-user").value = "";
         document.getElementById("login-pass").value = "";
         
-        // Limpiar resultados anteriores
         document.getElementById("batch-results-container").classList.add("hidden");
         document.getElementById("batch-results-body").innerHTML = "";
         document.getElementById("upload-msg").innerText = "";
@@ -366,18 +402,18 @@
                 data.resultados.forEach(res => {
                     const esExito = res.estado === "Éxito";
                     const estadoHtml = esExito ? '<span style="color:green; font-weight: 500;">Éxito</span>' : `<span style="color:red">${res.estado}</span>`;
-                    const botonDicom = esExito ? `<button class="btn-success" onclick="descargarArchivo('${res.archivo_dicom}')" style="padding: 6px 12px; font-size: 12px; width: auto;">Descargar .dcm</button>` : '-';
+                    const botonVer = esExito ? `<button style="padding: 6px 12px; font-size: 12px; width: auto;" onclick="verDICOM('${res.archivo_dicom}')">Ver en Web</button>` : '-';
+                    const botonDicom = esExito ? `<button class="btn-success" onclick="descargarArchivo('${res.archivo_dicom}')" style="padding: 6px 12px; font-size: 12px; width: auto; margin-left: 5px;">Descargar</button>` : '';
                     
                     tbody.innerHTML += `
                         <tr>
                             <td>${res.archivo_original}</td>
                             <td>${estadoHtml}</td>
-                            <td>${botonDicom}</td>
+                            <td>${botonVer} ${botonDicom}</td>
                         </tr>
                     `;
                 });
                 resultsContainer.classList.remove("hidden");
-                
                 fileInput.value = "";
             } else {
                 msjUpload.className = "msj-error";
@@ -412,6 +448,45 @@
         } catch (error) {
             alert("Error de conexión al intentar descargar.");
         }
+    }
+
+    // --- LÓGICA DE CORNERSTONE (VISOR DICOM) ---
+    cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+    cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+
+    async function verDICOM(nombreArchivo) {
+        document.getElementById("dicom-modal").classList.remove("hidden");
+        document.getElementById("visor-title").innerText = `Visualizando: ${nombreArchivo}`;
+        
+        const element = document.getElementById("dicomImage");
+        cornerstone.enable(element); 
+
+        try {
+            const response = await fetch(`${API_URL}/download/${nombreArchivo}`, {
+                method: "GET",
+                headers: { "Authorization": `Bearer ${userToken}` }
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const imageId = cornerstoneWADOImageLoader.wadouri.fileManager.add(blob);
+                
+                const image = await cornerstone.loadImage(imageId);
+                cornerstone.displayImage(element, image);
+            } else {
+                alert("Error de permisos al intentar ver la imagen.");
+                cerrarVisor();
+            }
+        } catch (error) {
+            alert("El archivo seleccionado no contiene píxeles compatibles o es un PDF encapsulado.");
+            cerrarVisor();
+        }
+    }
+
+    function cerrarVisor() {
+        document.getElementById("dicom-modal").classList.add("hidden");
+        const element = document.getElementById("dicomImage");
+        cornerstone.disable(element); 
     }
 </script>
 </body>
