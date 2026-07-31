@@ -2,12 +2,22 @@ from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from passlib.context import CryptContext
+from typing import List
 import os
 import datetime
 import numpy as np
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 from PIL import Image, ImageDraw
+
+# Importar nuestra base de datos
+from database import Base, engine, SessionLocal, Usuario
+
+# Crear las tablas en la base de datos si no existen
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Gestor Documental DICOM")
 
@@ -20,12 +30,41 @@ app.add_middleware(
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Base de datos temporal
-USUARIOS = {
-    "admin": "admin123",
-    "medico1": "secreta1"
-}
+# --- DEPENDENCIA DE BASE DE DATOS ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# --- SCHEMAS DE PYDANTIC (Validación de datos de entrada/salida) ---
+class UsuarioCreate(BaseModel):
+    nombres: str
+    apellidos: str
+    correo: str
+    telefono: str
+    password: str
+    rol: str = "usuario"
+
+class UsuarioResponse(BaseModel):
+    id: int
+    nombres: str
+    apellidos: str
+    correo: str
+    telefono: str
+    rol: str
+    activo: bool
+
+    class Config:
+        from_attributes = True
+
+# --- FUNCIONES DEL MOTOR DICOM (Mantén tus funciones aquí) ---
+# def crear_dataset_base(ruta_salida, sop_class_uid):
+# ... (MANTÉN TU CÓDIGO DICOM INTACTO AQUÍ) ...
+
 
 # --- FUNCIONES DEL MOTOR DICOM ---
 def crear_dataset_base(ruta_salida, sop_class_uid):
