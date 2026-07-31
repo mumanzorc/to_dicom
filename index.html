@@ -1,230 +1,82 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor Documental DICOM</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f6f8;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background: #ffffff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            width: 100%;
-            max-width: 400px;
-        }
-        h2 {
-            margin-top: 0;
-            color: #1a202c;
-            font-weight: 600;
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        .form-group {
-            margin-bottom: 16px;
-        }
-        label {
-            display: block;
-            font-size: 14px;
-            margin-bottom: 6px;
-            color: #4a5568;
-        }
-        input[type="text"], input[type="password"], input[type="file"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-size: 14px;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #2b6cb0;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        button:hover {
-            background-color: #2c5282;
-        }
-        .hidden {
-            display: none !important;
-        }
-        #mensaje {
-            margin-top: 16px;
-            font-size: 14px;
-            text-align: center;
-            color: #e53e3e;
-        }
-    </style>
-</head>
-<body>
+PACS - Gestor Documental
+    
 
-<div class="container">
-    <!-- Panel de Login -->
-    <div id="login-panel">
-        <h2>Acceso al Gestor</h2>
-        <div class="form-group">
-            <label>Usuario</label>
-            <input type="text" id="username" placeholder="Ej. admin">
-        </div>
-        <div class="form-group">
-            <label>Contraseña</label>
-            <input type="password" id="password" placeholder="••••••••">
-        </div>
-        <button onclick="iniciarSesion()">Iniciar Sesión</button>
-        <div id="mensaje"></div>
-    </div>
 
-    <!-- Panel de Subida de Archivos -->
-    <div id="upload-panel" class="hidden">
-        <h2>Convertidor DICOM</h2>
-        <div class="form-group">
-            <label>Seleccione archivo (TXT, JPG, PDF)</label>
-            <input type="file" id="fileInput">
-        </div>
-        <button onclick="subirArchivo()">Convertir a DICOM</button>
+
+
+
+    Acceso al Sistema
+    
+        Correo Electrónico (Usuario)
         
-        <div id="mensaje-upload" style="margin-top: 16px; font-size: 14px; text-align: center;"></div>
+    
+    
+        Contraseña
         
-        <!-- Botón de descarga -->
-        <div id="download-container" class="hidden" style="margin-top: 16px;">
-            <button id="btn-download" style="background-color: #38a169;">Descargar DICOM</button>
-        </div>
+    
+    Ingresar
+    
 
-        <button onclick="cerrarSesion()" style="background-color: #718096; margin-top: 16px;">Cerrar Sesión</button>
-    </div>
-</div>
 
-<script>
-    const API_URL = ""; 
-    let userToken = "";
 
-    async function iniciarSesion() {
-        const user = document.getElementById("username").value;
-        const pass = document.getElementById("password").value;
-        const msj = document.getElementById("mensaje");
 
-        const formData = new URLSearchParams();
-        formData.append("username", user);
-        formData.append("password", pass);
+    
+    
+    
+        Conversor DICOM
+        Gestión de Usuarios
+        Cerrar Sesión
+    
 
-        try {
-            const response = await fetch(`${API_URL}/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: formData
-            });
+    
+    
+        Convertir Archivo
+        
+            Seleccione archivo (TXT, JPG, PDF)
+            
+        
+        Convertir a DICOM
+        
+        
+        
+        
+            Descargar DICOM Generado
+        
+    
 
-            if (response.ok) {
-                const data = await response.json();
-                userToken = data.access_token;
+    
+    
+        
+            Directorio de Usuarios
+            + Nuevo Usuario
+        
+
+        
+        
+            Crear Credenciales
+            
+                Nombres
+                Apellidos
+                Correo
+                Teléfono
+                Contraseña temporal
+                Rol
+                    
+                        Médico / Usuario
+                        Administrador
+                    
                 
-                document.getElementById("login-panel").classList.add("hidden");
-                document.getElementById("upload-panel").classList.remove("hidden");
-                msj.innerText = "";
-            } else {
-                msj.innerText = "Credenciales incorrectas.";
-            }
-        } catch (error) {
-            msj.innerText = "Error conectando con el servidor.";
-        }
-    }
+            
+            Guardar Usuario
+            
+        
 
-    async function subirArchivo() {
-        const fileInput = document.getElementById("fileInput");
-        const msjUpload = document.getElementById("mensaje-upload");
-        const downloadContainer = document.getElementById("download-container");
-
-        downloadContainer.classList.add("hidden"); 
-
-        if (fileInput.files.length === 0) {
-            msjUpload.style.color = "#e53e3e";
-            msjUpload.innerText = "Por favor, seleccione un archivo.";
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append("file", fileInput.files[0]);
-
-        try {
-            msjUpload.style.color = "#3182ce";
-            msjUpload.innerText = "Convirtiendo archivo...";
-
-            const response = await fetch(`${API_URL}/upload`, {
-                method: "POST",
-                headers: { "Authorization": `Bearer ${userToken}` },
-                body: formData
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                msjUpload.style.color = "#38a169";
-                msjUpload.innerText = "¡Archivo convertido con éxito!";
+        
+        
+            
                 
-                downloadContainer.classList.remove("hidden");
-                const btnDownload = document.getElementById("btn-download");
-                btnDownload.onclick = () => descargarArchivo(data.archivo_dicom);
-
-            } else {
-                msjUpload.style.color = "#e53e3e";
-                msjUpload.innerText = "Error al convertir. Verifique el formato.";
-            }
-        } catch (error) {
-            msjUpload.style.color = "#e53e3e";
-            msjUpload.innerText = "Error subiendo el archivo.";
-        }
-    }
-
-    async function descargarArchivo(nombreArchivo) {
-        try {
-            const response = await fetch(`${API_URL}/download/${nombreArchivo}`, {
-                method: "GET",
-                headers: { "Authorization": `Bearer ${userToken}` }
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = nombreArchivo;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-            } else {
-                alert("Error: No se pudo descargar el archivo.");
-            }
-        } catch (error) {
-            alert("Error de conexión al intentar descargar.");
-        }
-    }
-
-    function cerrarSesion() {
-        userToken = "";
-        document.getElementById("upload-panel").classList.add("hidden");
-        document.getElementById("download-container").classList.add("hidden");
-        document.getElementById("login-panel").classList.remove("hidden");
-        document.getElementById("mensaje-upload").innerText = "";
-        document.getElementById("username").value = "";
-        document.getElementById("password").value = "";
-    }
-</script>
-
-</body>
-</html>
+                    Nombres
+                    Correo
+                    Teléfono
+                    Rol
+                    Estado
