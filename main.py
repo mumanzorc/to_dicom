@@ -214,42 +214,52 @@ async def actualizar_usuario(user_id: int, user_data: UsuarioCreate, db: Session
     
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), token: str = Depends(oauth2_scheme)):
-    """Recibe un archivo, evalúa su formato y lo convierte a DICOM."""
+async def upload_files(files: List[UploadFile] = File(...), token: str = Depends(oauth2_scheme)):
+    """Recibe múltiples archivos, los procesa y devuelve un reporte por lotes."""
     if not os.path.exists("archivos_recibidos"):
         os.makedirs("archivos_recibidos")
         
-    nombre_original = file.filename
-    extension = nombre_original.split('.')[-1].lower()
-    nombre_base = nombre_original.rsplit('.', 1)[0]
+    resultados = []
     
-    ruta_original = f"archivos_recibidos/{nombre_original}"
-    ruta_dicom = f"archivos_recibidos/{nombre_base}.dcm"
-    
-    # 1. Guardar el archivo temporalmente
-    with open(ruta_original, "wb+") as file_object:
-        file_object.write(await file.read())
+    for file in files:
+        nombre_original = file.filename
+        extension = nombre_original.split('.')[-1].lower()
+        nombre_base = nombre_original.rsplit('.', 1)[0]
         
-    # 2. Aplicar lógica DICOM según extensión
-    try:
-        if extension in ['jpg', 'jpeg']:
-            jpg_a_dicom(ruta_original, ruta_dicom)
-        elif extension == 'pdf':
-            pdf_a_dicom(ruta_original, ruta_dicom)
-        elif extension == 'txt':
-            txt_a_dicom(ruta_original, ruta_dicom)
-        else:
-            os.remove(ruta_original)
-            raise HTTPException(status_code=400, detail="Formato no soportado. Use JPG, PDF o TXT.")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en conversión: {str(e)}")
+        ruta_original = f"archivos_recibidos/{nombre_original}"
+        ruta_dicom = f"archivos_recibidos/{nombre_base}.dcm"
+        
+        # 1. Guardar archivo original
+        with open(ruta_original, "wb+") as file_object:
+            file_object.write(await file.read())
+            
+        # 2. Aplicar lógica DICOM según extensión
+        estado = "Éxito"
+        try:
+            if extension in ['jpg', 'jpeg']:
+                jpg_a_dicom(ruta_original, ruta_dicom)
+            elif extension == 'pdf':
+                pdf_a_dicom(ruta_original, ruta_dicom)
+            elif extension == 'txt':
+                txt_a_dicom(ruta_original, ruta_dicom)
+            else:
+                os.remove(ruta_original)
+                estado = "Error: Formato no soportado"
+        except Exception as e:
+            estado = f"Error interno: {str(e)}"
+            
+        # 3. Guardar el resultado de este archivo en el lote
+        resultados.append({
+            "archivo_original": nombre_original,
+            "archivo_dicom": f"{nombre_base}.dcm" if estado == "Éxito" else None,
+            "estado": estado
+        })
         
     return {
-        "mensaje": "Archivo convertido a DICOM exitosamente", 
-        "archivo_original": nombre_original,
-        "archivo_dicom": f"{nombre_base}.dcm",
-        "usuario_responsable": token
+        "mensaje": f"Procesamiento finalizado. {len(files)} archivos analizados.", 
+        "resultados": resultados
     }
+
 
 @app.get("/download/{filename}")
 async def download_file(filename: str, token: str = Depends(oauth2_scheme)):
