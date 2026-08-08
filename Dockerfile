@@ -8,12 +8,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar el código del servidor, la base de datos y la interfaz
-COPY database.py .
-COPY main.py .
-COPY index.html .
+COPY database.py main.py index.html ./
 
 # Crear la carpeta de almacenamiento interno
-RUN mkdir -p archivos_recibidos
+RUN mkdir -p archivos_dicom && useradd --create-home appuser && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8866
 
