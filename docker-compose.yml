@@ -1,30 +1,30 @@
-version: '3.8'
-
 services:
-  db_postgres:
-    image: postgres:15-alpine
-    container_name: gestor_dicom_db
+  db:
+    image: postgres:16-alpine
     environment:
-      POSTGRES_USER: admin_dicom
-      POSTGRES_PASSWORD: superpassword123
-      POSTGRES_DB: dicom_database
+      POSTGRES_USER: ${POSTGRES_USER:-dicom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-dicom}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: always
-
-  backend_dicom:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dicom}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  app:
     build: .
-    container_name: gestor_dicom_api
-    ports:
-      - "8866:8866"
+    ports: ["8866:8866"]
+    env_file: .env
     environment:
-      - SECURE_COOKIE=false
-      - DATABASE_URL=postgresql://admin_dicom:superpassword123@db_postgres/dicom_database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dicom}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-dicom}
+      STORAGE_DIR: /app/archivos_dicom
     volumes:
-      - ./archivos_recibidos:/app/archivos_recibidos
+      - dicom_files:/app/archivos_dicom
     depends_on:
-      - db_postgres
-    restart: always
-
+      db: {condition: service_healthy}
+    restart: unless-stopped
 volumes:
   postgres_data:
+  dicom_files:
